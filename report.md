@@ -1,80 +1,80 @@
-# Fama–French (1993) 三因子构造的复现与扩展
+# Replication and Extension of the Fama–French (1993) Three-Factor Construction
 
-> 实证报告 · ECON6067 独立项目
-> 复现对象：Fama, E. F. & French, K. R. (1993), "Common Risk Factors in the Returns on Stocks and Bonds," *Journal of Financial Economics*, 33(1), 3–56.
-
----
-
-## 1. 研究问题与动机
-
-Fama 和 French (1993) 提出的核心问题是：**股票收益的横截面差异能否被少数几个共同因子概括？** 他们识别出三个股票市场因子——市场超额收益（MKT-RF）、规模因子（SMB）和账面市值比因子（HML），并证明这些因子能解释大部分按规模与账面市值比排序组合的收益差异。
-
-本项目的目标不是复现论文中的每一个检验，而是**聚焦于因子构造本身**：从原始 CRSP / Compustat 数据出发，重建 2000–2025 年的月度 MKT-RF、SMB 和 HML 序列，与 Kenneth French 数据库的官方序列对比，并在其基础上完成一项独立扩展。这一过程的可迁移价值在于：它覆盖了"原始数据 → 样本清洗 → 变量定义 → 组合排序 → 因子构造 → 验证"的完整实证工作流，适用于任何需要从微观数据构造宏观序列或指数的工作。
+> Empirical report · ECON6067 individual project
+> Replication target: Fama, E. F. & French, K. R. (1993), "Common Risk Factors in the Returns on Stocks and Bonds," *Journal of Financial Economics*, 33(1), 3–56.
 
 ---
 
-## 2. 数据来源、样本构建与变量定义
+## 1. Research question and motivation
 
-### 2.1 数据来源
+Fama and French (1993) ask whether the cross-sectional variation in stock returns can be summarised by a small set of common factors. They identify three stock-market factors — the market excess return (MKT-RF), a size factor (SMB) and a book-to-market factor (HML) — and show that these factors explain much of the variation in returns across portfolios sorted on size and book-to-market.
 
-| 数据 | 来源 | 用途 |
+The goal of this project is not to replicate every test in the paper, but to focus on **the factor construction itself**: rebuild the monthly MKT-RF, SMB and HML series for 2000–2025 from raw CRSP / Compustat data, compare them against the official Kenneth French series, and add an independent extension. The transferable value of the exercise is that it covers the full empirical workflow — raw data → sample cleaning → variable definition → portfolio sorting → factor construction → validation — that underlies any task requiring the construction of aggregate series or indices from micro data.
+
+---
+
+## 2. Data sources, sample construction and variable definitions
+
+### 2.1 Data sources
+
+| Data | Source | Use |
 |---|---|---|
-| CRSP Monthly Stock | 课程包 02（`monthly_stock.csv`，2000–2025，242 万行） | 月度收益、价格、流通股数、市值、市场收益 |
-| F-F 因子与无风险利率 | 课程包 02（`F-F factors and RF.csv`） | 官方基准因子 + RF |
-| Compustat Annual | 课程包 04（`Compustat.csv`） | 账面权益的会计科目 |
-| CRSP-Compustat 链接表 | 课程包 04（`CCM.csv`） | 将 Compustat 公司（gvkey）链接到 CRSP 证券（permno） |
+| CRSP Monthly Stock | Course package 02 (`monthly_stock.csv`, 2000–2025, 2.42m rows) | monthly returns, prices, shares outstanding, market capitalisation, market return |
+| F-F factors and risk-free rate | Course package 02 (`F-F factors and RF.csv`) | official benchmark factors + RF |
+| Compustat Annual | Course package 04 (`Compustat.csv`) | accounting items for book equity |
+| CRSP-Compustat link table | Course package 04 (`CCM.csv`) | links Compustat firms (gvkey) to CRSP securities (permno) |
 
-原始数据为受限数据，不进入 GitHub 仓库；获取方式见 `README.md`。
+The raw data are restricted and are not committed to the GitHub repository; acquisition is documented in `README.md`.
 
-### 2.2 样本筛选（universe）
+### 2.2 Sample (universe)
 
-因子构造遵循 Fama–French 的"美国普通股"口径，保留同时满足以下条件的证券-月份观测：
+Factor construction follows Fama–French's "US common equity" universe. A stock-month observation is kept only if it satisfies all of:
 
-| 字段 | 条件 | 含义 |
+| Field | Condition | Meaning |
 |---|---|---|
-| `SecurityType` | `EQTY` | 普通股权（剔除约 64 万基金观测） |
-| `ShareType` | `NS` | 普通普通股（剔除 ADR、单位等） |
-| `USIncFlg` | `Y` | 美国注册公司 |
-| `IssuerType` | `CORP` | 经营公司（剔除 REIT 与非经营主体） |
+| `SecurityType` | `EQTY` | ordinary equity (drops ~640k fund rows) |
+| `ShareType` | `NS` | ordinary common shares (drops ADRs, units, etc.) |
+| `USIncFlg` | `Y` | US-incorporated firm |
+| `IssuerType` | `CORP` | operating corporation (drops REITs and non-operating issuers) |
 | `PrimaryExch` | `N`/`A`/`Q` | NYSE / NYSE American / NASDAQ |
 
-筛选后为 1,339,565 个证券-月份、12,949 只证券。NYSE 断点只使用 `PrimaryExch = "N"` 的股票计算（FF 惯例）。
+This leaves 1,339,565 stock-months across 12,949 securities. NYSE breakpoints are computed using only `PrimaryExch = "N"` stocks (Fama–French convention).
 
-**数据质量处理**：原始 `monthly_stock.csv` 中存在完全重复的（PERMNO, 月份）行（共 2,755 行，源于数据源多表 join 的产物）。这些重复行会使价值加权重复计数、严重扭曲组合收益（例如 2001 年 7 月的 S/L 组合被错误算成 +19.79%，实际约 −4.5%）。因此按 `(PERMNO, YYYYMM)` 去重，每个证券-月份只保留一条。
+**Data-quality step.** The raw `monthly_stock.csv` contains fully duplicated (PERMNO, month) rows (2,755 rows, an artefact of a multi-table join at the source). These duplicates would double-count securities in the value-weighting and materially distort portfolio returns (e.g. the S/L portfolio for July 2001 was wrongly computed as +19.79% instead of about −4.5%). They are therefore dropped on `(PERMNO, YYYYMM)`, keeping one observation per stock-month.
 
-### 2.3 变量定义
+### 2.3 Variable definitions
 
-**市场权益（ME）**：`ME = MthCap / 1000`（单位：百万美元）。`MthCap` 已等于价格 × 流通股数（千美元），负价格取绝对值由数据源处理。
+**Market equity (ME):** `ME = MthCap / 1000` (millions of USD). `MthCap` already equals price × shares outstanding (thousands of USD); negative prices are handled at the source.
 
-**账面权益（BE）**：按 Fama–French 定义构建：
+**Book equity (BE):** constructed following Fama–French:
 
 ```
-BE = SEQ + TXDITC − 优先股
-优先股 = PSTKRV（赎回价值），缺失则 PSTKL（清算价值），再缺失则 PSTK（账面价值），再缺失为 0
-若 SEQ 缺失：BE = CEQ + PSTK
-若 SEQ、CEQ 均缺失：BE = AT − LT
+BE = SEQ + TXDITC − preferred stock
+preferred stock = PSTKRV (redemption), else PSTKL (liquidation), else PSTK (carrying), else 0
+if SEQ missing: BE = CEQ + PSTK
+if SEQ and CEQ missing: BE = AT − LT
 ```
 
-其中 `TXDITC`（递延税 + 投资税收抵免）缺失按 0 处理。仅保留 BE > 0 的观测（94,523 个公司-年度）。注：`describe.md` 中提到的 `TXDB` 字段在实际数据中为 `txditc`，二者含义一致（递延税与投资税收抵免）。
+`TXDITC` (deferred taxes and investment tax credit) is treated as 0 when missing. Only BE > 0 observations are retained (94,523 firm-years). Note that the `TXDB` field mentioned in the assignment brief is the `txditc` field in the actual data; the two refer to the same item.
 
-**账面市值比（BM）**：对第 t 年 6 月的排序，`BM = BE(财年结束于 t−1 年) / ME(第 t−1 年 12 月)`。会计年度以 `datadate` 的日历年标识（即"财年结束于日历年 t−1"），保证会计数据在 6 月排序时已可用（至少 6 个月滞后）。
+**Book-to-market (BM):** for the June sort of year t, `BM = BE(fiscal year ending in calendar year t−1) / ME(Dec t−1)`. The fiscal year is identified by the calendar year of `datadate` ("fiscal year ending in calendar year t−1"), which guarantees the accounting data are available at the June sort (a lag of at least six months).
 
-**CRSP-Compustat 链接**：保留主链接或条件主链接（`LINKPRIM ∈ {P, C}`）且类型为当前/未研究（`LINKTYPE ∈ {LC, LU}`）的链接；并施加链接有效期（`LINKDT ≤ datadate ≤ LINKENDDT`，`E` 表示仍有效）。同一（permno, 财年）若有多条 BE，取 `datadate` 最新者。
+**CRSP-Compustat link:** keep primary or conditional-primary links (`LINKPRIM ∈ {P, C}`) of type current/unresearched (`LINKTYPE ∈ {LC, LU}`), and require the link to be active at the fiscal-year end (`LINKDT ≤ datadate ≤ LINKENDDT`, with `E` meaning still active). If several BE records map to one (permno, fiscal year), the latest `datadate` is kept.
 
-**退市处理**：数据无独立退市收益字段（仅有退市标志 `MthDelFlg`，全样本退市事件约 1,177 起），`MthRet` 已包含可获得的总收益。此点与官方基准存在轻微差异，但对价值加权组合影响极小，作为已记录的局限。
+**Delisting:** the data contain no separate delisting-return field (only a delisting flag, `MthDelFlg`, with ~1,177 delisting events in the sample); `MthRet` already contains the total return available. This is a documented limitation with negligible effect on value-weighted portfolios.
 
 ---
 
-## 3. 实证设计
+## 3. Empirical design
 
-每年 6 月底，用 NYSE 股票确定断点，将全样本股票分为 2 个规模组 × 3 个账面市值比组：
+Each June, NYSE stocks define the breakpoints that split the full sample into 2 size groups × 3 book-to-market groups:
 
-- **规模**：`Small` = ME(6月) < NYSE 中位数；`Big` = 其余
-- **账面市值比**：`Low` < 30% 分位；`Medium` ∈ [30%, 70%]；`High` > 70% 分位（均为 NYSE 分位）
+- **Size:** `Small` = ME(June) < NYSE median; `Big` = otherwise
+- **Book-to-market:** `Low` < 30th pct; `Medium` ∈ [30th, 70th]; `High` > 70th pct (NYSE percentiles)
 
-形成 6 个组合 S/L、S/M、S/H、B/L、B/M、B/H，从当年 7 月持有到次年 6 月。组合月收益为**价值加权**（权重 = 月初市值 = 上月末 ME）。
+This yields six portfolios S/L, S/M, S/H, B/L, B/M, B/H, held from July of year t through June of year t+1. Monthly portfolio returns are **value-weighted** (weight = market equity at the start of the month, i.e. prior-month ME).
 
-三因子构造：
+The three factors are:
 
 ```
 MKT-RF = vwretd − RF
@@ -82,46 +82,46 @@ SMB    = (S/L + S/M + S/H)/3 − (B/L + B/M + B/H)/3
 HML    = (S/H + B/H)/2 − (S/L + B/L)/2
 ```
 
-其中 `vwretd` 为 CRSP 全市场价值加权收益，RF 取自官方基准数据。样本 2000–2025 年，因子序列从 2001 年 7 月（首次 6 月排序之后）至 2025 年 12 月，共 294 个月。
+where `vwretd` is the CRSP value-weighted market return and RF is taken from the official benchmark data. The sample runs 2000–2025; the factor series spans July 2001 (after the first June sort) through December 2025, 294 months.
 
 ---
 
-## 4. 核心复现结果与原文比较
+## 4. Core replication results and comparison with the benchmark
 
-### 4.1 描述统计（月度，2001-07 至 2025-12）
+### 4.1 Descriptive statistics (monthly, 2001-07 to 2025-12)
 
-| 因子 | 均值(%) | 标准差(%) | t 值 | 年化均值(%) | 年化 Sharpe |
+| Factor | Mean(%) | Std(%) | t-stat | Ann. mean(%) | Ann. Sharpe |
 |---|---|---|---|---|---|
-| MKT-RF（构造） | 0.68 | 4.43 | 2.64 | 8.50 | 0.55 |
-| MKT-RF（官方） | 0.73 | 4.44 | 2.82 | 9.13 | 0.59 |
-| SMB（构造） | 0.18 | 2.62 | 1.19 | 2.20 | 0.24 |
-| SMB（官方） | 0.06 | 2.60 | 0.42 | 0.77 | 0.09 |
-| HML（构造） | −0.00 | 3.13 | −0.00 | −0.00 | −0.00 |
-| HML（官方） | 0.04 | 3.09 | 0.19 | 0.42 | 0.04 |
+| MKT-RF (constructed) | 0.68 | 4.43 | 2.64 | 8.50 | 0.55 |
+| MKT-RF (official) | 0.73 | 4.44 | 2.82 | 9.13 | 0.59 |
+| SMB (constructed) | 0.18 | 2.62 | 1.19 | 2.20 | 0.24 |
+| SMB (official) | 0.06 | 2.60 | 0.42 | 0.77 | 0.09 |
+| HML (constructed) | −0.00 | 3.13 | −0.00 | −0.00 | −0.00 |
+| HML (official) | 0.04 | 3.09 | 0.19 | 0.42 | 0.04 |
 
-### 4.2 相关性
+### 4.2 Correlations
 
-| 因子 | 月度相关性 | R² |
+| Factor | Monthly correlation | R² |
 |---|---|---|
 | MKT-RF | **0.9973** | 0.994 |
 | SMB | **0.9616** | 0.925 |
 | HML | **0.9539** | 0.910 |
 
-### 4.3 跟踪回归（构造值 = α + β × 官方值）
+### 4.3 Tracking regression (constructed = α + β × official)
 
-| 因子 | α（%/月） | β | R² |
+| Factor | α (%/mo) | β | R² |
 |---|---|---|---|
 | MKT-RF | −0.05 | 0.995 | 0.994 |
 | SMB | +0.12 | 0.967 | 0.925 |
 | HML | −0.03 | 0.967 | 0.910 |
 
-跟踪回归显示 α 均接近 0（3–12 bp/月），β 接近 1，说明构造因子与官方序列在水平和波动上高度一致。累计收益曲线（`output/figures/cumulative_*.png`）中，构造序列与官方序列几乎重合。
+The tracking regressions show intercepts close to zero (3–12 bp/month) and slopes close to one, so the constructed factors are highly consistent with the official series in both level and volatility. In the cumulative-return plots (`outputs/figures/cumulative_*.png`) the constructed and official series are nearly indistinguishable.
 
-### 4.4 差异来源
+### 4.4 Sources of the differences
 
-HML 的相关性随时期变化明显（`correlation_by_subperiod.csv`）：
+The HML correlation varies markedly over time (`outputs/tables/correlation_by_subperiod.csv`):
 
-| 时期 | HML 相关性 |
+| Period | HML correlation |
 |---|---|
 | 2001–2005 | 0.782 |
 | 2006–2010 | 0.958 |
@@ -129,66 +129,66 @@ HML 的相关性随时期变化明显（`correlation_by_subperiod.csv`）：
 | 2016–2020 | 0.973 |
 | 2021–2025 | 0.985 |
 
-早期（2001–2005）HML 差异最大，之后逐步收敛。主要差异来源（均为可解释的正常偏差）：
+The gap is largest in the early sample (2001–2005) and converges thereafter. The main sources of difference — all explainable, ordinary deviations — are:
 
-1. **数据版本**：官方因子基于 Kenneth French 当年计算时的 Compustat 数据 vintage，而本项目使用当前（restated）Compustat。早期样本（互联网泡沫时期）的会计数据 restatement 影响相对更大。
-2. **样本覆盖**：早期 Compustat 对小市值/新兴公司的覆盖较低，影响 High-BM 组的构成。
-3. **账面权益的精确定义**：优先股科目（`pstkrv`/`pstkl`/`pstk`）在早期报告口径不同，导致 BE 略有差异。
-4. **规模分位**：本项目 SMB 的 β = 0.967、均值略高（0.18% vs 0.06%），反映样本规模分布与官方略有不同。
+1. **Data vintage:** the official factors use the Compustat vintage available when Kenneth French computed them, whereas this project uses the current (restated) Compustat. The effect is largest for the early sample (the dot-com period), where accounting restatements matter more.
+2. **Coverage:** early Compustat coverage of small and newly listed firms is thinner, affecting the composition of the High-BM group.
+3. **Book-equity definition:** the preferred-stock items (`pstkrv`/`pstkl`/`pstk`) were reported differently in early years, so BE differs slightly.
+4. **Size tilt:** the constructed SMB has β = 0.967 and a slightly higher mean (0.18% vs 0.06%), reflecting a marginally different size distribution.
 
-这些差异的方向与文献中"复现官方因子通常存在 3–8% 的月度相关性缺口"的经验一致；本项目 HML 相关性 0.95 已属高质量复现。
+These differences are consistent with the experience in the literature that replicating the official factors typically leaves a 3–8% monthly-correlation gap; an HML correlation of 0.95 is a high-quality replication.
 
 ---
 
-## 5. 独立扩展：动量因子与三/四因子模型比较
+## 5. Extension: a momentum factor and a three- vs four-factor comparison
 
-### 5.1 动机与经济问题
+### 5.1 Motivation and economic question
 
-三因子模型的一个著名遗漏是**动量**：Carhart (1997) 发现，加入"赢家减输家"（WML）动量因子能显著改善模型对收益的解释力。本扩展提出一个明确问题：**在 2000–2025 年样本中，动量因子是否仍在三因子之外提供增量解释力？** 这一问题既有文献基础，又因动量溢价在 2000 年后的明显减弱而具有现实张力。
+A well-known omission of the three-factor model is **momentum**: Carhart (1997) shows that adding a winners-minus-losers (WML) factor markedly improves the model's explanatory power. This extension asks a concrete question: **over 2000–2025, does a momentum factor still add incremental explanatory power beyond the three factors?** The question has a clear literature basis and real tension, given the well-documented weakening of the momentum premium after 2000.
 
-### 5.2 构造与检验设计
+### 5.2 Construction and test design
 
-- **动量因子**：每月用"过去 2–12 月累计收益（跳过最近一月）"作为信号，按 NYSE 断点做 2（规模）× 3（动量）排序，`WML = (S/W + B/W)/2 − (S/L + B/L)/2`，每月再平衡。WML 序列 300 个月（2001-01 至 2025-12），均值 +0.12%/月、标准差 4.87%、t = 0.43。
-- **检验资产**：25 个 size-B/M 组合（5×5 NYSE 五分位排序，每年 6 月再平衡，价值加权）。
-- **检验方法**：对每个组合做时间序列回归，比较三因子与四因子模型的 **GRS 检验**、平均绝对 α、平均 R²。
+- **Momentum factor:** each month, stocks are sorted on cumulative return over the past 2–12 months (skipping the most recent month) into 2 size × 3 momentum portfolios using NYSE breakpoints; `WML = (S/W + B/W)/2 − (S/L + B/L)/2`, rebalanced monthly. The WML series spans 300 months (2001-01 to 2025-12) with mean +0.12%/month, standard deviation 4.87% and t = 0.43.
+- **Test assets:** 25 size-B/M portfolios (5×5 NYSE quintile sorts, annual June rebalancing, value-weighted).
+- **Test:** time-series regressions of each portfolio on the three- and four-factor models, comparing the **GRS statistic**, mean absolute alpha, and mean R².
 
-### 5.3 结果
+### 5.3 Results
 
-| 模型 | GRS | p 值 | 平均\|α\|(%/月) | 平均 R² | 显著 α 占比 |
+| Model | GRS | p-value | mean \|α\|(%/mo) | mean R² | significant-α share |
 |---|---|---|---|---|---|
 | FF3 | 5.33 | < 0.001 | 0.230 | 0.901 | 64% |
 | FF4 | 5.10 | < 0.001 | 0.223 | 0.902 | 64% |
 
-子样本（`ff4_model_comparison_subperiod.csv`）：
+Sub-samples (`outputs/tables/ff4_model_comparison_subperiod.csv`):
 
-| 时期 | 模型 | GRS | 平均\|α\|(%/月) | 平均 R² |
+| Period | Model | GRS | mean \|α\|(%/mo) | mean R² |
 |---|---|---|---|---|
 | 2001–2012 | FF3 → FF4 | 2.68 → 2.81 | 0.244 → 0.237 | 0.900 → 0.903 |
 | 2013–2025 | FF3 → FF4 | 4.24 → 4.05 | 0.220 → 0.220 | 0.912 → 0.913 |
 
-### 5.4 解释
+### 5.4 Interpretation
 
-结果支持一个**谨慎而诚实**的结论：在 2000–2025 年样本中，动量因子对三因子的增量解释力**有限**——全样本 GRS 仅从 5.33 降至 5.10，平均绝对 α 仅下降 0.007%/月，且两个模型均被 GRS 检验强烈拒绝（25 个 size-B/M 组合的定价误差仍然显著）。子样本进一步揭示**时期依赖**：2001–2012 年加入动量反而略微恶化 GRS（对应 2009 年著名的动量崩盘），而 2013–2025 年略有改善。
+The results support a careful and honest conclusion: over 2000–2025 the momentum factor adds only **limited** incremental explanatory power to the three-factor model — the full-sample GRS statistic falls only from 5.33 to 5.10 and the mean absolute alpha falls by just 0.007%/month, while both models are strongly rejected by the GRS test (pricing errors on the 25 size-B/M portfolios remain significant). The sub-samples reveal **period dependence**: in 2001–2012 adding momentum slightly worsens the GRS statistic (consistent with the well-known momentum crash of 2009), whereas in 2013–2025 it helps marginally.
 
-这与文献共识一致：美国动量溢价在 2000 年后大幅减弱，Carhart 四因子相对三因子的边际价值随样本期与检验资产的不同而波动。本扩展的价值在于：通过标准化的 GRS 框架量化了这一边际价值，并揭示了其时期异质性——这是一个比"加入动量必然改善模型"更有信息量的发现。
+This is consistent with the literature consensus that the US momentum premium weakened substantially after 2000, and that the marginal value of the Carhart four-factor model relative to the three-factor model fluctuates with the sample period and test assets. The value of this extension lies in quantifying that marginal value in a standard GRS framework and documenting its period heterogeneity — a more informative finding than the pre-set conclusion that "adding momentum always helps".
 
 ---
 
-## 6. 验证、局限性与结论
+## 6. Validation, limitations and conclusion
 
-### 6.1 验证
+### 6.1 Validation
 
-- **市场因子一致性**：CRSP `vwretd` 与官方 `Mkt-RF + RF` 的相关性达 0.999，验证了 RF 与市场收益的对应关系，MKT-RF 的复现基本精确。
-- **数值与单位核对**：官方因子为百分数、CRSP 收益为小数，全部统一为小数后比较；基准文件解析时跳过说明头与年度行，仅取 6 位 `YYYYMM` 月度行。
-- **数据质量检查**：识别并去除完全重复的证券-月份行，避免价值加权重复计数。
+- **Market-factor consistency:** the CRSP `vwretd` correlates at 0.999 with the official `Mkt-RF + RF`, confirming the correspondence between the risk-free rate and the market return; the MKT-RF replication is essentially exact.
+- **Units:** official factors are in percent and CRSP returns are decimals; all are converted to decimals before comparison. The benchmark file is parsed by skipping the header text and annual rows, keeping only the six-digit `YYYYMM` monthly rows.
+- **Data quality:** fully duplicated stock-month rows were identified and removed so that value-weighting counts each security-month exactly once.
 
-### 6.2 局限性
+### 6.2 Limitations
 
-1. 无独立退市收益字段，退市处理仅做最小化处理。
-2. Compustat 数据为当前 vintage，与官方因子的历史 vintage 存在固有差异。
-3. 因子序列从 2001 年 7 月起（需首次 6 月排序），比官方序列少 6 个月。
-4. 动量因子的 12–1 窗口、30/70 断点为标准设定，未做窗口稳健性检验。
+1. No separate delisting-return field; delisting is handled minimally.
+2. Compustat data are the current vintage, which differs inherently from the historical vintage used for the official factors.
+3. The factor series starts in July 2001 (after the first June sort), six months shorter than the official series.
+4. The momentum factor uses the standard 12–1 window and 30/70 breakpoints; window robustness checks are left for future work.
 
-### 6.3 结论
+### 6.3 Conclusion
 
-本项目从原始 CRSP/Compustat 数据出发，成功重建了 2000–2025 年月度 MKT-RF、SMB、HML 三因子：市场因子与官方序列几乎重合（ρ = 0.997），SMB（ρ = 0.962）与 HML（ρ = 0.954）也达到高质量复现，跟踪回归 α 接近 0、β 接近 1。差异主要来自数据版本与样本覆盖，且集中在早期样本。独立扩展部分构造了动量因子并完成三/四因子比较，发现动量在 2000–2025 年对三因子仅有边际增量解释力且呈时期依赖，与文献中动量溢价减弱的证据一致。全部结果可由 `code/` 下按序执行的脚本从原始数据一键复现。
+This project reconstructs the monthly MKT-RF, SMB and HML factors for 2000–2025 from raw CRSP/Compustat data. The market factor matches the official series almost exactly (ρ = 0.997), and SMB (ρ = 0.962) and HML (ρ = 0.954) are also replicated to a high standard, with tracking-regression intercepts near zero and slopes near one. The remaining differences stem mainly from data vintage and coverage, concentrated in the early sample. The extension constructs a momentum factor and compares the three- and four-factor models, finding that momentum adds only marginal, period-dependent explanatory power over 2000–2025, consistent with the evidence of a weakened momentum premium. All results are reproducible from the raw data by running the scripts in `code/` in order.
