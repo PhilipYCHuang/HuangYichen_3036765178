@@ -1,0 +1,42 @@
+# ---------------------------------------------------------------------------
+# Course materials / personal notes (not part of the reproducible deliverable)
+# ---------------------------------------------------------------------------
+hw.pdf
+describe.md
+whole process/
+02_Monthly_Stocks_and_Factors/
+04_Supplementary_Data/
+*.zip
+*.ZIP
+
+# ---------------------------------------------------------------------------
+# Raw input data (CRSP / Compustat, restricted).  The folders are documented
+# locations; only their READMEs are committed, never the data files.
+# ---------------------------------------------------------------------------
+data/raw/*
+!data/raw/README.md
+
+# ---------------------------------------------------------------------------
+# Processed firm-level intermediates (derivatives of restricted data).
+# Regenerable by running code/01..04; only the README is committed.
+# ---------------------------------------------------------------------------
+data/processed/*
+!data/processed/README.md
+
+# ---------------------------------------------------------------------------
+# Python / environment
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# ---------------------------------------------------------------------------
+# OS / editor
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
